@@ -42,63 +42,21 @@ export default class TikzjaxPlugin extends Plugin {
 	// #endregion
 
 
-	// #region Support pop-out windows | 弹出窗口相关
-	loadTikZJax(doc: Document) {
-		const s = document.createElement("script");
-		s.id = "tikzjax";
-		s.type = "text/javascript";
-		s.innerText = tikzjaxJs;
-		doc.body.appendChild(s);
-
-		doc.addEventListener('tikzjax-load-finished', this.postProcessSvg);
-	}
-	unloadTikZJax(doc: Document) {
-		const s = doc.getElementById("tikzjax");
-		s.remove();
-
-		doc.removeEventListener("tikzjax-load-finished", this.postProcessSvg);
-	}
-	loadTikZJaxAllWindows() {
-		for (const window of this.getAllWindows()) {
-			this.loadTikZJax(window.document);
-		}
-	}
-	unloadTikZJaxAllWindows() {
-		for (const window of this.getAllWindows()) {
-			this.unloadTikZJax(window.document);
-		}
-	}
-	getAllWindows() {
-		// Via https://discord.com/channels/686053708261228577/840286264964022302/991591350107635753
-
-		const windows = [];
-		
-		// push the main window's root split to the list | 将主窗口的根分割推到列表中
-		windows.push(this.app.workspace.rootSplit.win);
-		
-		// @ts-ignore floatingSplit is undocumented
-		const floatingSplit = this.app.workspace.floatingSplit;
-		floatingSplit.children.forEach((child: any) => {
-			// if this is a window, push it to the list | 如果这是一个窗口，把它推到列表中
-			if (child instanceof WorkspaceWindow) {
-				windows.push(child.win);
-			}
-		});
-
-		return windows;
-	}
-	// #endregion
-
-
 	// #region CodeBlock About | 代码块相关
 	/// 注册代码块类型：tikz
 	registerTikzCodeBlock() {
 		this.registerMarkdownCodeBlockProcessor("tikz", (source, el, ctx) => {
+			// 渲染原理：使用 tikzjax 库，详见：https://github.com/kisonecat/tikzjax
+			// 创建一个有原文本类型的代码script块，并填入内容，如：
+			// <script type="text/tikz">
+			// \begin{tikzpicture}
+			// 	\draw (0,0) circle (1in);
+			// \end{tikzpicture}
+			// </script>
+			// 等待其自动渲染并抛出 'tikzjax-load-finished' 事件
 			const script = el.createEl("script");
-
 			script.setAttribute("type", "text/tikz");
 			script.setAttribute("data-show-console", "true");
-
 			script.setText(this.registerTikzCodeBlock_tidyTikzSource(source));
 		});
 	}
@@ -130,6 +88,55 @@ export default class TikzjaxPlugin extends Plugin {
 	removeSyntaxHighlighting() {
 		// @ts-ignore
 		window.CodeMirror.modeInfo = window.CodeMirror.modeInfo.filter(el => el.name != "Tikz");
+	}
+	// #endregion
+
+
+	// #region Support pop-out windows | 弹出窗口相关
+	// tikzijax完成渲染后会抛出 'tikzjax-load-finished' 事件
+	loadTikZJaxAllWindows() {
+		for (const window of this.getAllWindows()) {
+			this.loadTikZJax(window.document);
+		}
+	}
+	loadTikZJax(doc: Document) {
+		const s = document.createElement("script");
+		s.id = "tikzjax";
+		s.type = "text/javascript";
+		s.innerText = tikzjaxJs;
+		doc.body.appendChild(s);
+
+		doc.addEventListener('tikzjax-load-finished', this.postProcessSvg);
+	}
+	unloadTikZJaxAllWindows() {
+		for (const window of this.getAllWindows()) {
+			this.unloadTikZJax(window.document);
+		}
+	}
+	unloadTikZJax(doc: Document) {
+		const s = doc.getElementById("tikzjax");
+		s.remove();
+
+		doc.removeEventListener("tikzjax-load-finished", this.postProcessSvg);
+	}
+	getAllWindows() {
+		// Via https://discord.com/channels/686053708261228577/840286264964022302/991591350107635753
+
+		const windows = [];
+		
+		// push the main window's root split to the list | 将主窗口的根分割推到列表中
+		windows.push(this.app.workspace.rootSplit.win);
+		
+		// @ts-ignore floatingSplit is undocumented
+		const floatingSplit = this.app.workspace.floatingSplit;
+		floatingSplit.children.forEach((child: any) => {
+			// if this is a window, push it to the list | 如果这是一个窗口，把它推到列表中
+			if (child instanceof WorkspaceWindow) {
+				windows.push(child.win);
+			}
+		});
+
+		return windows;
 	}
 	// #endregion
 
